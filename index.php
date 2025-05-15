@@ -1,199 +1,76 @@
 <?php
-session_start(); // Mulai sesi di setiap halaman
+// FILE: index.php
+require_once 'User.php';
+require_once 'Item.php';
+require_once 'Pemesanan.php';
+require_once 'Pembayaran.php';
+require_once 'LaporanBulanan.php';
+require_once 'Session.php';
 
-require_once __DIR__ . '/controllers/SearchController.php';
-require_once __DIR__ . '/controllers/DetailController.php';
-require_once __DIR__ . '/controllers/BookingController.php';
-require_once __DIR__ . '/controllers/PaymentController.php';
-require_once __DIR__ . '/controllers/PenaltyController.php';
-require_once __DIR__ . '/controllers/CommissionController.php';
-require_once __DIR__ . '/controllers/AdminController.php';
-require_once __DIR__ . '/controllers/AuthController.php';
+session_start();
 
-$searchController = new SearchController();
-$detailController = new DetailController();
-$bookingController = new BookingController();
-$paymentController = new PaymentController();
-$adminController = new AdminController();
-$authController = new AuthController();
+// Dummy Data
+$dummyUser = new User("Roid Robih", "roid@example.com", "123456", "admin", "aktif", "Surakarta");
+$dummyItem = new Item(1, "Proyektor", "Elektronik", 3, "Gedung A", "tersedia");
+$dummyBooking = new Pemesanan(1, 1, 1, "menunggu", date("Y-m-d"));
+$dummyPembayaran = new Pembayaran(1, 1, 50000.0, "belum bayar", "transfer");
+$laporan = new LaporanBulanan("Mei 2025", [$dummyPembayaran]);
+$session = Session::createSession(1, "admin");
 
-$action = $_GET['action'] ?? 'login'; // Halaman login sebagai default
-
-// Middleware sederhana untuk memeriksa apakah pengguna sudah login
-function isLoggedIn() {
-    return isset($_SESSION['user_id']) && isset($_SESSION['role']);
-}
-
-// Middleware sederhana untuk memeriksa peran pengguna
-function checkRole($role) {
-    return isLoggedIn() && $_SESSION['role'] === $role;
-}
-
-switch ($action) {
-    case 'login':
-        if (isLoggedIn()) {
-            // Redirect ke halaman home sesuai peran jika sudah login
-            if (checkRole('penyewa')) {
-                header('Location: index.php?action=penyewaHome');
-            } elseif (checkRole('penyedia')) {
-                header('Location: index.php?action=penyediaHome');
-            } elseif (checkRole('admin')) {
-                header('Location: index.php?action=adminHome');
-            }
-            exit();
-        }
-        $authController->showLoginForm();
-        break;
-    case 'prosesLogin': // Action dari form login
-        $authController->login();
-        break;
-    case 'logout':
-        $authController->logout();
-        break;
-    case 'penyewaHome':
-        if (checkRole('penyewa')) {
-            $authController->penyewaHome();
-        } else {
-            echo "Akses ditolak.";
-        }
-        break;
-    case 'penyediaHome':
-        if (checkRole('penyedia')) {
-            $authController->penyediaHome();
-        } else {
-            echo "Akses ditolak.";
-        }
-        break;
-    case 'adminHome':
-        if (checkRole('admin')) {
-            $authController->adminHome();
-        } else {
-            echo "Akses ditolak.";
-        }
-        break;
-    case 'cariItem':
-        if (isLoggedIn() && checkRole('penyewa')) {
-            $kataKunci = $_GET['kataKunci'] ?? '';
-            $searchController->tampilkanHasilPencarian($kataKunci);
-        } else {
-            echo "Anda harus login sebagai penyewa untuk mengakses fitur ini.";
-        }
-        break;
-    case 'lihatDetailItem':
-        if (isLoggedIn() && checkRole('penyewa')) {
-            $itemId = $_GET['id'] ?? null;
-            if ($itemId) {
-                $detailController->lihatDetail($itemId);
-            } else {
-                echo "ID Item tidak valid.";
-            }
-        } else {
-            echo "Anda harus login sebagai penyewa untuk mengakses fitur ini.";
-        }
-        break;
-    case 'pesanItem':
-        if (isLoggedIn() && checkRole('penyewa')) {
-            $itemId = $_GET['id'] ?? null;
-            $penyewaId = $_SESSION['user_id']; // Ambil ID penyewa dari sesi
-            if ($itemId) {
-                $bookingController->pesanItem($itemId, $penyewaId);
-            } else {
-                echo "ID Item tidak valid.";
-            }
-        } else {
-            echo "Anda harus login sebagai penyewa untuk mengakses fitur ini.";
-        }
-        break;
-    case 'lihatDetailBooking':
-        if (isLoggedIn()) {
-            $bookingId = $_GET['id'] ?? null;
-            if ($bookingId) {
-                $bookingController->lihatDetail($bookingId);
-            } else {
-                echo "ID Booking tidak valid.";
-            }
-        } else {
-            echo "Anda harus login untuk mengakses fitur ini.";
-        }
-        break;
-    case 'lihatStatusBooking':
-        if (isLoggedIn()) {
-            $bookingId = $_GET['id'] ?? null;
-            if ($bookingId) {
-                $bookingController->lihatStatus($bookingId);
-            } else {
-                echo "ID Booking tidak valid.";
-            }
-        } else {
-            echo "Anda harus login untuk mengakses fitur ini.";
-        }
-        break;
-    case 'batalkanPesanan':
-        if (isLoggedIn() && checkRole('penyewa')) {
-            $bookingId = $_GET['id'] ?? null;
-            if ($bookingId) {
-                $bookingController->batalkanPesanan($bookingId);
-            } else {
-                echo "ID Booking tidak valid.";
-            }
-        } else {
-            echo "Anda harus login sebagai penyewa untuk mengakses fitur ini.";
-        }
-        break;
-    case 'bayar':
-        if (isLoggedIn() && checkRole('penyewa')) {
-            $bookingId = $_POST['bookingId'] ?? null;
-            $metode = $_POST['metode'] ?? '';
-            $jumlah = $_POST['jumlah'] ?? 0;
-            if ($bookingId) {
-                $paymentController->bayar($bookingId, $metode, $jumlah);
-            } else {
-                echo "ID Booking tidak valid.";
-            }
-        } else {
-            echo "Anda harus login sebagai penyewa untuk mengakses fitur ini.";
-        }
-        break;
-    case 'konfirmasiPesanan':
-        if (isLoggedIn() && checkRole('admin')) {
-            $orderId = $_GET['id'] ?? null;
-            if ($orderId) {
-                $adminController->konfirmasiPesanan($orderId);
-            } else {
-                echo "ID Pesanan tidak valid.";
-            }
-        } else {
-            echo "Anda harus login sebagai admin untuk mengakses fitur ini.";
-        }
-        break;
-    case 'kelolaTransaksi':
-        if (isLoggedIn() && checkRole('admin')) {
-            $bookingId = $_GET['id'] ?? null;
-            if ($bookingId) {
-                $adminController->kelolaTransaksi($bookingId);
-            } else {
-                echo "ID Booking tidak valid.";
-            }
-        } else {
-            echo "Anda harus login sebagai admin untuk mengakses fitur ini.";
-        }
-        break;
-    case 'hitungKomisi':
-        if (isLoggedIn() && checkRole('admin')) {
-            $transactionId = $_GET['id'] ?? null;
-            if ($transactionId) {
-                echo "Komisi: Rp " . number_format($adminController->hitungKomisi($transactionId), 0, ',', '.');
-            } else {
-                echo "ID Transaksi tidak valid.";
-            }
-        } else {
-            echo "Anda harus login sebagai admin untuk mengakses fitur ini.";
-        }
-        break;
-    default:
-        echo "Halaman tidak ditemukan.";
-        break;
-}
+// Simpan session user
+$_SESSION['user'] = $dummyUser;
+$_SESSION['session'] = $session;
 
 ?>
-            
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RuPin - Peminjaman Ruang dan Alat</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { color: #333; }
+    .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Selamat Datang di RuPin (Ruang & Peralatan)</h1>
+
+  <div class="box">
+    <h2>Data User (Login)</h2>
+    <p><strong>Nama:</strong> <?= $_SESSION['user']->nama ?></p>
+    <p><strong>Email:</strong> <?= $_SESSION['user']->email ?></p>
+    <p><strong>Role:</strong> <?= $_SESSION['user']->role ?></p>
+  </div>
+
+  <div class="box">
+    <h2>Item Tersedia</h2>
+    <p><strong>Nama Item:</strong> <?= $dummyItem->nama ?></p>
+    <p><strong>Jumlah:</strong> <?= $dummyItem->jumlah ?></p>
+    <p><strong>Status:</strong> <?= $dummyItem->status ?></p>
+  </div>
+
+  <div class="box">
+    <h2>Pemesanan</h2>
+    <p><strong>Item ID:</strong> <?= $dummyBooking->itemId ?></p>
+    <p><strong>Status:</strong> <?= $dummyBooking->status ?></p>
+    <p><strong>Tanggal:</strong> <?= $dummyBooking->tanggal ?></p>
+  </div>
+
+  <div class="box">
+    <h2>Status Pembayaran</h2>
+    <p><strong>Metode:</strong> <?= $dummyPembayaran->metode ?></p>
+    <p><strong>Jumlah:</strong> Rp<?= number_format($dummyPembayaran->jumlah, 0, ',', '.') ?></p>
+    <p><strong>Status:</strong> <?= $dummyPembayaran->status ?></p>
+  </div>
+
+  <div class="box">
+    <h2>Laporan Bulanan (<?= $laporan->bulan ?>)</h2>
+    <ul>
+      <?php foreach ($laporan->getTransaksiByBulan("Mei 2025") as $p): ?>
+        <li>ID Pembayaran: <?= $p->pembayaranId ?> - Jumlah: Rp<?= number_format($p->jumlah, 0, ',', '.') ?> - Status: <?= $p->status ?></li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+</body>
+</html>
